@@ -28,14 +28,14 @@ pthread_cond_t full_1 = PTHREAD_COND_INITIALIZER;
 // ------------------------------ Buffer 2 -------------------------------------
 // Defining Buffer2, shared line separator thread and plus sign thread
 int buffer_2[LINE_SIZE];
-// Defining counter for buffer 1
+// Defining counter for buffer 2
 int count_2 = 0;
 // Index where the input thread will put next item
 int prod_idx_2 = 0;
 // Index where the line separator thread will pick up the next item
 int con_idx_2 = 0;
 
-// Initialize the mutex for buffer 1
+// Initialize the mutex for buffer 2
 pthread_mutex_t mutex_2 = PTHREAD_MUTEX_INITIALIZER;
 
 // Initialize the condition variable for buffer 2
@@ -43,13 +43,20 @@ pthread_cond_t full_2 = PTHREAD_COND_INITIALIZER;
 // -----------------------------------------------------------------------------
 
 // // ------------------------------ Buffer 3 -------------------------------------
-// // Defining Buffer1, shared between plus sign thread and output thread
-// int buffer_3[LINE_SIZE];
-// // Defining counter for buffer 1
-// int count_3 = 0;
+// Defining Buffer3, shared between plus sign thread and output thread
+int buffer_3[LINE_SIZE];
+// Defining counter for buffer 3
+int count_3 = 0;
+// Index where the input thread will put next item
+int prod_idx_3 = 0;
+// Index where the line separator thread will pick up the next item
+int con_idx_3 = 0;
 
-// // Initialize the mutex for buffer 1
-// pthread_mutex_t mutex_3 = PTHREAD_MUTEX_INITIALIZER;
+// Initialize the mutex for buffer 3
+pthread_mutex_t mutex_3 = PTHREAD_MUTEX_INITIALIZER;
+
+// Initialize the condition variable for buffer 2
+pthread_cond_t full_3 = PTHREAD_COND_INITIALIZER;
 // // -----------------------------------------------------------------------------
 
 
@@ -143,7 +150,46 @@ char get_buff_2() {
 
 }
 
-void put_buff_3() {
+void put_buff_3(char item) {
+    
+    // Lock the mutex before putting item in the buffer
+    pthread_mutex_lock(&mutex_3);
+
+    // Put the item in the buffer
+    buffer_3[prod_idx_3] = item;
+
+    // Increment the index where the next item will be put
+    prod_idx_3 += 1;
+    count_3 += 1;
+
+    // Signal to the consumer the buffer is no longer empty
+    pthread_cond_signal(&full_3);
+    // Unlock the mutex
+    pthread_mutex_unlock(&mutex_3);
+}
+
+char get_buff_3() {
+
+    // Lock the mutex before checking if the buffer has data
+    pthread_mutex_lock(&mutex_3);
+
+    // While the buffer is empty
+    while(count_3 == 0) {
+        // Wait for the producer to signal that the buffer has data
+        pthread_cond_wait(&full_3, &mutex_3);
+    }
+    // Copy next value from the buffer to the current character
+    char currChar = buffer_3[con_idx_3];
+
+    // Increment the index from which the item will be picked up
+    con_idx_3 = con_idx_3 + 1;
+    count_3--;
+
+    // Unlock the mutex
+    pthread_mutex_unlock(&mutex_3);
+
+    //return the character
+    return currChar;
 
 }
 
@@ -166,19 +212,18 @@ char* get_user_input() {
 
 void get_input() {
 
-    // Get the current Line
-    while(count_1 < 80) {
+    // While there are less than 80 items in the buffer
+    while(count_1 < OUTPUT_LENGTH) {
+
+        // Get a line from the user and enter it into the buffer
         char currLine[LINE_SIZE];
         strcpy(currLine, get_user_input());
         for (int j = 0; j < strlen(currLine); j++) {
-        put_buff_1(currLine[j]);
+            put_buff_1(currLine[j]);
+        }
     }
 
-    }
-
-    
-
-    // return NULL;
+    // return NULL
 }
 
 /*******************************************************************
@@ -188,7 +233,7 @@ void replace_separator() {
 
     char item;
 
-    for(int i = 0; i < OUTPUT_LENGTH; i++) {
+    while(count_1 > 0) {
         
         // Get the item from the buffer
         item = get_buff_1();
@@ -209,13 +254,74 @@ void replace_separator() {
 void replace_plus() {
 
     char item;
+    char nextItem;
 
-    for( int i = 0; i < OUTPUT_LENGTH; i++) {
+    while(count_2 > 0) {
+
+        // Get the next item from the buffer
         item = get_buff_2();
-        printf("%c", item);
+        // nextItem = get_buff_2();
+
+        // printf("First item - %c\n", item);
+        // printf("Next item - %c\n", nextItem);
+        // printf("%d\n", i);
+
+
+
+        // If the item is a plus sign
+        if (item == '+') {
+
+            // get the next item
+            nextItem = get_buff_2();
+
+            // printf("%c", nextItem);
+
+            // If the next item is a plus sign
+            if (nextItem == '+') {
+
+                // printf("Two in a row!");
+
+                // Add the ^ sign to the buffer
+                put_buff_3('^');
+                // i--;
+                // Move the buffer variables back one
+                // con_idx_3 = con_idx_3 - 1;
+                // count_3++;
+            }
+            // If the next value isn't a plus sign
+            else {
+                // Put both values in the next buffer
+                put_buff_3(item);
+                put_buff_3(nextItem);
+            }
+        }
+        // If the item is not a plus sign
+        else {
+            put_buff_3(item);
+        }
+    }
+}
+
+/*******************************************************************
+ * This function will write the processed data to standard output as
+ * lines of exactly 80 characters
+********************************************************************/
+void write_output() {
+
+    char item;
+
+    while (count_3 > OUTPUT_LENGTH) {
+
+        for(int i = 0; i < OUTPUT_LENGTH; i++) {
+
+            item = get_buff_3();
+
+            printf("%c", item);
+
+        }
+        printf("\n");
     }
 
-    
 }
 
 
@@ -233,7 +339,7 @@ void *executeFunctions(void *args) {
 
     replace_separator();
     replace_plus();
-    // write_output();
+    write_output();
 
     return NULL;
 }
@@ -255,10 +361,3 @@ int main() {
 
 
 
-/*******************************************************************
- * This function will write the processed data to standard output as
- * lines of exactly 80 characters
-********************************************************************/
-void write_output() {
-
-}
