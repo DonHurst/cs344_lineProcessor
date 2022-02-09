@@ -6,7 +6,7 @@
 
 #define LINE_SIZE 1000
 #define NUM_OF_LINES 50
-#define OUTPUT_LENGTH 5
+#define OUTPUT_LENGTH 80
 
 // ------------------------------ Buffer 1 -------------------------------------
 // Defining Buffer1, shared between input thread and line separator thread
@@ -25,15 +25,22 @@ pthread_mutex_t mutex_1 = PTHREAD_MUTEX_INITIALIZER;
 pthread_cond_t full_1 = PTHREAD_COND_INITIALIZER;
 // -----------------------------------------------------------------------------
 
-// // ------------------------------ Buffer 2 -------------------------------------
-// // Defining Buffer2, shared line separator thread and plus sign thread
-// int buffer_2[LINE_SIZE];
-// // Defining counter for buffer 1
-// int count_2 = 0;
+// ------------------------------ Buffer 2 -------------------------------------
+// Defining Buffer2, shared line separator thread and plus sign thread
+int buffer_2[LINE_SIZE];
+// Defining counter for buffer 1
+int count_2 = 0;
+// Index where the input thread will put next item
+int prod_idx_2 = 0;
+// Index where the line separator thread will pick up the next item
+int con_idx_2 = 0;
 
-// // Initialize the mutex for buffer 1
-// pthread_mutex_t mutex_2 = PTHREAD_MUTEX_INITIALIZER;
-// // -----------------------------------------------------------------------------
+// Initialize the mutex for buffer 1
+pthread_mutex_t mutex_2 = PTHREAD_MUTEX_INITIALIZER;
+
+// Initialize the condition variable for buffer 2
+pthread_cond_t full_2 = PTHREAD_COND_INITIALIZER;
+// -----------------------------------------------------------------------------
 
 // // ------------------------------ Buffer 3 -------------------------------------
 // // Defining Buffer1, shared between plus sign thread and output thread
@@ -93,7 +100,46 @@ char get_buff_1() {
     
 }
 
-void put_buff_2() {
+void put_buff_2(char item) {
+    // Lock the mutex before putting item in the buffer
+    pthread_mutex_lock(&mutex_2);
+
+    // Put the item in the buffer
+    buffer_2[prod_idx_2] = item;
+
+    // Increment the index where the next item will be put
+    prod_idx_2 += 1;
+    count_2 += 1;
+
+    // Signal to the consumer the buffer is no longer empty
+    pthread_cond_signal(&full_2);
+    // Unlock the mutex
+    pthread_mutex_unlock(&mutex_2);
+
+}
+
+char get_buff_2() {
+
+    // Lock the mutex before checking if the buffer has data
+    pthread_mutex_lock(&mutex_2);
+
+    // While the buffer is empty
+    while(count_2 == 0) {
+        // Wait for the producer to signal that the buffer has data
+        pthread_cond_wait(&full_2, &mutex_2);
+    }
+    // Copy next value from the buffer to the current character
+    char currChar = buffer_2[con_idx_2];
+
+    // Increment the index from which the item will be picked up
+    con_idx_2 = con_idx_2 + 1;
+    count_2--;
+
+    // Unlock the mutex
+    pthread_mutex_unlock(&mutex_2);
+
+    //return the character
+    return currChar;
 
 }
 
@@ -121,12 +167,16 @@ char* get_user_input() {
 void get_input() {
 
     // Get the current Line
-    char currLine[LINE_SIZE];
-    strcpy(currLine, get_user_input());
-
-    for (int i = 0; i < strlen(currLine); i++) {
-        put_buff_1(currLine[i]);
+    while(count_1 < 80) {
+        char currLine[LINE_SIZE];
+        strcpy(currLine, get_user_input());
+        for (int j = 0; j < strlen(currLine); j++) {
+        put_buff_1(currLine[j]);
     }
+
+    }
+
+    
 
     // return NULL;
 }
@@ -137,12 +187,35 @@ void get_input() {
 void replace_separator() {
 
     char item;
-    for(int i = 0; i < OUTPUT_LENGTH; i++) {
-        item = get_buff_1();
-        printf("%c\n", item);
-    }
-    
 
+    for(int i = 0; i < OUTPUT_LENGTH; i++) {
+        
+        // Get the item from the buffer
+        item = get_buff_1();
+
+        // If the character is an endline char, replace with space
+        if(item == '\n') {
+            item = ' ';
+        }
+
+        // Put the item in the second buffer
+        put_buff_2(item);
+    }
+}
+
+/*******************************************************************
+ * This function will replace pairs of + signs (++) with ^
+********************************************************************/
+void replace_plus() {
+
+    char item;
+
+    for( int i = 0; i < OUTPUT_LENGTH; i++) {
+        item = get_buff_2();
+        printf("%c", item);
+    }
+
+    
 }
 
 
@@ -159,7 +232,7 @@ void *executeFunctions(void *args) {
 
 
     replace_separator();
-    // replace_plus();
+    replace_plus();
     // write_output();
 
     return NULL;
@@ -180,12 +253,7 @@ int main() {
 
 
 
-/*******************************************************************
- * This function will replace pairs of + signs (++) with ^
-********************************************************************/
-void replace_plus() {
 
-}
 
 /*******************************************************************
  * This function will write the processed data to standard output as
