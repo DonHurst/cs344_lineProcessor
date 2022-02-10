@@ -67,9 +67,6 @@ pthread_cond_t full_3 = PTHREAD_COND_INITIALIZER;
 // Put an item in the buffer
 void put_buff_1(char item) {
     
-    // Lock the mutex before putting item in the buffer
-    pthread_mutex_lock(&mutex_1);
-
     // Put the item in the buffer
     buffer_1[prod_idx_1] = item;
 
@@ -77,33 +74,24 @@ void put_buff_1(char item) {
     prod_idx_1 += 1;
     count_1 += 1;
 
-    // Signal to the consumer the buffer is no longer empty
-    pthread_cond_signal(&full_1);
-    // Unlock the mutex
-    pthread_mutex_unlock(&mutex_1);
-
 }
 
 // Get an item from the buffer
 char get_buff_1() {
 
-    // Lock the mutex before checking if the buffer has data
-    pthread_mutex_lock(&mutex_1);
 
-    // While the buffer is empty
-    while(count_1 == 0) {
-        // Wait for the producer to signal that the buffer has data
-        pthread_cond_wait(&full_1, &mutex_1);
-    }
+    
     // Copy next value from the buffer to the current character
     char currChar = buffer_1[con_idx_1];
 
     // Increment the index from which the item will be picked up
     con_idx_1 = con_idx_1 + 1;
+
+    // Decrement the count for # of items in buffer
     count_1--;
 
     // Unlock the mutex
-    pthread_mutex_unlock(&mutex_1);
+    // pthread_mutex_unlock(&mutex_1);
 
     //return the character
     return currChar;
@@ -111,8 +99,8 @@ char get_buff_1() {
 }
 
 void put_buff_2(char item) {
-    // Lock the mutex before putting item in the buffer
-    pthread_mutex_lock(&mutex_2);
+    
+    
 
     // Put the item in the buffer
     buffer_2[prod_idx_2] = item;
@@ -121,23 +109,14 @@ void put_buff_2(char item) {
     prod_idx_2 += 1;
     count_2 += 1;
 
-    // Signal to the consumer the buffer is no longer empty
-    pthread_cond_signal(&full_2);
-    // Unlock the mutex
-    pthread_mutex_unlock(&mutex_2);
+    
 
 }
 
 char get_buff_2() {
 
-    // Lock the mutex before checking if the buffer has data
-    pthread_mutex_lock(&mutex_2);
 
-    // While the buffer is empty
-    while(count_2 == 0) {
-        // Wait for the producer to signal that the buffer has data
-        pthread_cond_wait(&full_2, &mutex_2);
-    }
+    
     // Copy next value from the buffer to the current character
     char currChar = buffer_2[con_idx_2];
 
@@ -146,7 +125,7 @@ char get_buff_2() {
     count_2--;
 
     // Unlock the mutex
-    pthread_mutex_unlock(&mutex_2);
+    // pthread_mutex_unlock(&mutex_2);
 
     //return the character
     return currChar;
@@ -155,8 +134,7 @@ char get_buff_2() {
 
 void put_buff_3(char item) {
     
-    // Lock the mutex before putting item in the buffer
-    pthread_mutex_lock(&mutex_3);
+   
 
     // Put the item in the buffer
     buffer_3[prod_idx_3] = item;
@@ -165,22 +143,15 @@ void put_buff_3(char item) {
     prod_idx_3 += 1;
     count_3 += 1;
 
-    // Signal to the consumer the buffer is no longer empty
-    pthread_cond_signal(&full_3);
-    // Unlock the mutex
-    pthread_mutex_unlock(&mutex_3);
+    
 }
 
 char get_buff_3() {
 
     // Lock the mutex before checking if the buffer has data
-    pthread_mutex_lock(&mutex_3);
+    // pthread_mutex_lock(&mutex_3);
 
-    // While the buffer is empty
-    while(count_3 == 0) {
-        // Wait for the producer to signal that the buffer has data
-        pthread_cond_wait(&full_3, &mutex_3);
-    }
+    
     // Copy next value from the buffer to the current character
     char currChar = buffer_3[con_idx_3];
 
@@ -189,7 +160,7 @@ char get_buff_3() {
     count_3--;
 
     // Unlock the mutex
-    pthread_mutex_unlock(&mutex_3);
+    // pthread_mutex_unlock(&mutex_3);
 
     //return the character
     return currChar;
@@ -211,12 +182,15 @@ char* get_user_input() {
     
 }
 
-void get_input() {
 
-    
+
+void* get_input(void *args) { 
 
     // While there are less than 80 items in the buffer
-    while(count_1 < OUTPUT_LENGTH && stopFlag == 0) {
+    while(stopFlag == 0) {
+
+        // Lock the mutex before putting item in the buffer
+        pthread_mutex_lock(&mutex_1);
 
         // Get a line from the user and enter it into the buffer
         char currLine[LINE_SIZE];
@@ -230,43 +204,68 @@ void get_input() {
         for (int j = 0; j < strlen(currLine); j++) {
             put_buff_1(currLine[j]);
         }
+        // Signal to the consumer the buffer is no longer empty
+        pthread_cond_signal(&full_1);
+        // Unlock the mutex
+        pthread_mutex_unlock(&mutex_1);
+
     }
 
-    // return NULL
+    
+    return NULL;
 }
 
-/*******************************************************************
- * This function will replace line separators with a space
-********************************************************************/
-void replace_separator() {
+
+void* replace_separator(void* args) {
 
     char item;
 
-    while(count_1 > 0) {
+    // While the buffer is empty
+    while(count_1 == 0) {
+        
+        // Wait for the producer to signal that the buffer has data
+        pthread_cond_wait(&full_1, &mutex_1);
+    }
+
+    //Lock the mutex before putting item in the buffer
+    pthread_mutex_lock(&mutex_2);
+
+    while(count_1 > 0) {   
         
         // Get the item from the buffer
         item = get_buff_1();
 
-        // printf("\nThe item- %c\n", item);
-
         // If the character is an endline char, replace with space
         if(item == '\n') {
             item = ' ';
-            // printf("The item - S%cS", item);
         }
 
         // Put the item in the second buffer
         put_buff_2(item);
     }
+
+    // Signal to the consumer the buffer is no longer empty
+    pthread_cond_signal(&full_2);
+    // Unlock the mutex
+    pthread_mutex_unlock(&mutex_2);
+
+    return NULL;
 }
 
-/*******************************************************************
- * This function will replace pairs of + signs (++) with ^
-********************************************************************/
-void replace_plus() {
+
+
+void* replace_plus(void* args) {
 
     char item;
     char nextItem;
+
+    // While the buffer is empty
+    while(count_2 == 0) {
+        // Wait for the producer to signal that the buffer has data
+        pthread_cond_wait(&full_2, &mutex_2);
+    }
+
+    pthread_mutex_lock(&mutex_3);
 
     while(count_2 > 0) {
 
@@ -278,8 +277,6 @@ void replace_plus() {
 
             // get the next item
             nextItem = get_buff_2();
-
-            // printf("%c", nextItem);
 
             // If the next item is a plus sign
             if (nextItem == '+') {
@@ -299,17 +296,28 @@ void replace_plus() {
             put_buff_3(item);
         }
     }
+
+    // Signal to the consumer the buffer is no longer empty
+    pthread_cond_signal(&full_3);
+    // Unlock the mutex
+    pthread_mutex_unlock(&mutex_3);
+
+    return NULL;
 }
 
-/*******************************************************************
- * This function will write the processed data to standard output as
- * lines of exactly 80 characters
-********************************************************************/
-void write_output() {
+
+
+void* write_output(void* args) {
 
     char item;
 
-    while (count_3 > OUTPUT_LENGTH && stopFlag == 0) {
+    // While the buffer is empty
+    while(count_3 == 0) {
+        // Wait for the producer to signal that the buffer has data
+        pthread_cond_wait(&full_3, &mutex_3);
+    }
+
+    while (count_3 > OUTPUT_LENGTH) {
 
         for(int i = 0; i < OUTPUT_LENGTH; i++) {
 
@@ -318,39 +326,37 @@ void write_output() {
 
         }
         printf("\n");
-    }
 
-}
-
-
-/*******************************************************************
- * This function will get input from the user
-********************************************************************/
-void *executeFunctions(void *args) {
-
-    while(stopFlag == 0) {
-        get_input();
-        replace_separator();
-        replace_plus();
-        write_output();
     }
     return NULL;
 }
 
+
+
+
 int main() {
 
     // Instantiate single thread
-    pthread_t singleThread;
-    pthread_create(&singleThread, NULL, executeFunctions, NULL);
+    // pthread_t singleThread;
+    // pthread_create(&singleThread, NULL, executeFunctions, NULL);
 
-    // Wait for threads to terminate
-    pthread_join(singleThread, NULL);
+    pthread_t get_input_t, replace_separator_t, replace_plus_t, write_output_t;
+
+    // Create the threads
+    pthread_create(&get_input_t, NULL, get_input, NULL);
+    pthread_create(&replace_separator_t,NULL,replace_separator,NULL);
+    pthread_create(&replace_plus_t,NULL,replace_plus,NULL);
+    pthread_create(&write_output_t,NULL,write_output,NULL);
+
+    // Wait for the threads to terminate
+    pthread_join(get_input_t,NULL);
+    pthread_join(replace_separator_t,NULL);
+    pthread_join(replace_plus_t,NULL);
+    pthread_join(write_output_t,NULL);
+
+    // // Wait for threads to terminate
+    // pthread_join(singleThread, NULL);
 
 
-    return 0;
+    return EXIT_SUCCESS;
 }
-
-
-
-
-
