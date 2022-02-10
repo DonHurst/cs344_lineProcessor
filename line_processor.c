@@ -222,9 +222,9 @@ void get_input() {
         char currLine[LINE_SIZE];
         strcpy(currLine, get_user_input());
 
-        int check = strncmp(currLine, "STOP", 4);
+        int check = strncmp(currLine, "STOP\n", 5);
 
-        if (check == 0) {
+        if (check == 0 ) {
             stopFlag = 1;
         }
         for (int j = 0; j < strlen(currLine); j++) {
