@@ -8,6 +8,9 @@
 #define NUM_OF_LINES 50
 #define OUTPUT_LENGTH 80
 
+// Flag for stopping the program
+int stopFlag = 0;
+
 // ------------------------------ Buffer 1 -------------------------------------
 // Defining Buffer1, shared between input thread and line separator thread
 int buffer_1[LINE_SIZE];
@@ -201,8 +204,6 @@ char* get_user_input() {
     char* inputLine;
     inputLine = (char*)malloc(LINE_SIZE * sizeof(char));
 
-    printf(":");
-
     // Get the user's input and return
     // source: https://www.geeksforgeeks.org/taking-string-input-space-c-3-different-methods/
     scanf("%[^\n]%*c", inputLine);
@@ -212,12 +213,20 @@ char* get_user_input() {
 
 void get_input() {
 
+    
+
     // While there are less than 80 items in the buffer
-    while(count_1 < OUTPUT_LENGTH) {
+    while(count_1 < OUTPUT_LENGTH && stopFlag == 0) {
 
         // Get a line from the user and enter it into the buffer
         char currLine[LINE_SIZE];
         strcpy(currLine, get_user_input());
+
+        int check = strncmp(currLine, "STOP", 4);
+
+        if (check == 0) {
+            stopFlag = 1;
+        }
         for (int j = 0; j < strlen(currLine); j++) {
             put_buff_1(currLine[j]);
         }
@@ -310,12 +319,11 @@ void write_output() {
 
     char item;
 
-    while (count_3 > OUTPUT_LENGTH) {
+    while (count_3 > OUTPUT_LENGTH && stopFlag == 0) {
 
         for(int i = 0; i < OUTPUT_LENGTH; i++) {
 
             item = get_buff_3();
-
             printf("%c", item);
 
         }
@@ -325,22 +333,17 @@ void write_output() {
 }
 
 
-
 /*******************************************************************
  * This function will get input from the user
 ********************************************************************/
 void *executeFunctions(void *args) {
 
-    // Create a local string and copy the input from the user to it
-    // char localString[LINE_SIZE];
-    get_input();
-    // printf("\n The local String: %s", localString);
-
-
-    replace_separator();
-    replace_plus();
-    write_output();
-
+    while(stopFlag == 0) {
+        get_input();
+        replace_separator();
+        replace_plus();
+        write_output();
+    }
     return NULL;
 }
 
