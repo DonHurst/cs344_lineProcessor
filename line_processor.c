@@ -206,7 +206,7 @@ char* get_user_input() {
 
     // Get the user's input and return
     // source: https://www.geeksforgeeks.org/taking-string-input-space-c-3-different-methods/
-    scanf("%[^\n]%*c", inputLine);
+    fgets(inputLine, LINE_SIZE, stdin);
     return inputLine;
     
 }
@@ -247,9 +247,12 @@ void replace_separator() {
         // Get the item from the buffer
         item = get_buff_1();
 
+        // printf("\nThe item- %c\n", item);
+
         // If the character is an endline char, replace with space
         if(item == '\n') {
             item = ' ';
+            // printf("The item - S%cS", item);
         }
 
         // Put the item in the second buffer
@@ -269,13 +272,6 @@ void replace_plus() {
 
         // Get the next item from the buffer
         item = get_buff_2();
-        // nextItem = get_buff_2();
-
-        // printf("First item - %c\n", item);
-        // printf("Next item - %c\n", nextItem);
-        // printf("%d\n", i);
-
-
 
         // If the item is a plus sign
         if (item == '+') {
@@ -288,14 +284,8 @@ void replace_plus() {
             // If the next item is a plus sign
             if (nextItem == '+') {
 
-                // printf("Two in a row!");
-
                 // Add the ^ sign to the buffer
                 put_buff_3('^');
-                // i--;
-                // Move the buffer variables back one
-                // con_idx_3 = con_idx_3 - 1;
-                // count_3++;
             }
             // If the next value isn't a plus sign
             else {
