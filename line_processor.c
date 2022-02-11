@@ -45,7 +45,7 @@ pthread_mutex_t mutex_2 = PTHREAD_MUTEX_INITIALIZER;
 pthread_cond_t full_2 = PTHREAD_COND_INITIALIZER;
 // -----------------------------------------------------------------------------
 
-// // ------------------------------ Buffer 3 -------------------------------------
+// ------------------------------ Buffer 3 -------------------------------------
 // Defining Buffer3, shared between plus sign thread and output thread
 int buffer_3[LINE_SIZE];
 // Defining counter for buffer 3
@@ -60,7 +60,7 @@ pthread_mutex_t mutex_3 = PTHREAD_MUTEX_INITIALIZER;
 
 // Initialize the condition variable for buffer 2
 pthread_cond_t full_3 = PTHREAD_COND_INITIALIZER;
-// // -----------------------------------------------------------------------------
+// -----------------------------------------------------------------------------
 
 
 
@@ -73,13 +73,10 @@ void put_buff_1(char item) {
     // Increment the index where the next item will be put
     prod_idx_1 += 1;
     count_1 += 1;
-
 }
 
 // Get an item from the buffer
 char get_buff_1() {
-
-
     
     // Copy next value from the buffer to the current character
     char currChar = buffer_1[con_idx_1];
@@ -90,33 +87,22 @@ char get_buff_1() {
     // Decrement the count for # of items in buffer
     count_1--;
 
-    // Unlock the mutex
-    // pthread_mutex_unlock(&mutex_1);
-
     //return the character
     return currChar;
-    
 }
 
 void put_buff_2(char item) {
     
-    
-
     // Put the item in the buffer
     buffer_2[prod_idx_2] = item;
 
     // Increment the index where the next item will be put
     prod_idx_2 += 1;
     count_2 += 1;
-
-    
-
 }
 
 char get_buff_2() {
 
-
-    
     // Copy next value from the buffer to the current character
     char currChar = buffer_2[con_idx_2];
 
@@ -124,12 +110,8 @@ char get_buff_2() {
     con_idx_2 = con_idx_2 + 1;
     count_2--;
 
-    // Unlock the mutex
-    // pthread_mutex_unlock(&mutex_2);
-
     //return the character
     return currChar;
-
 }
 
 void put_buff_3(char item) {
@@ -148,19 +130,12 @@ void put_buff_3(char item) {
 
 char get_buff_3() {
 
-    // Lock the mutex before checking if the buffer has data
-    // pthread_mutex_lock(&mutex_3);
-
-    
     // Copy next value from the buffer to the current character
     char currChar = buffer_3[con_idx_3];
 
     // Increment the index from which the item will be picked up
     con_idx_3 = con_idx_3 + 1;
     count_3--;
-
-    // Unlock the mutex
-    // pthread_mutex_unlock(&mutex_3);
 
     //return the character
     return currChar;
@@ -186,32 +161,35 @@ char* get_user_input() {
 
 void* get_input(void *args) { 
 
+    // Lock the mutex before putting item in the buffer
+        pthread_mutex_lock(&mutex_1);
+
     // While there are less than 80 items in the buffer
     while(stopFlag == 0) {
-
-        // Lock the mutex before putting item in the buffer
-        pthread_mutex_lock(&mutex_1);
 
         // Get a line from the user and enter it into the buffer
         char currLine[LINE_SIZE];
         strcpy(currLine, get_user_input());
 
+        // Check if the current line is a STOP value
         int check = strncmp(currLine, "STOP\n", 5);
 
+        // If the current line is a stop, set the flag
         if (check == 0 ) {
             stopFlag = 1;
         }
+
+        // Put the current line values in buffer 1
         for (int j = 0; j < strlen(currLine); j++) {
             put_buff_1(currLine[j]);
         }
+
         // Signal to the consumer the buffer is no longer empty
         pthread_cond_signal(&full_1);
         // Unlock the mutex
         pthread_mutex_unlock(&mutex_1);
 
     }
-
-    
     return NULL;
 }
 
@@ -220,34 +198,45 @@ void* replace_separator(void* args) {
 
     char item;
 
-    // While the buffer is empty
-    while(count_1 == 0) {
-        
-        // Wait for the producer to signal that the buffer has data
-        pthread_cond_wait(&full_1, &mutex_1);
-    }
-
     //Lock the mutex before putting item in the buffer
     pthread_mutex_lock(&mutex_2);
 
-    while(count_1 > 0) {   
+    while(stopFlag == 0) {
         
-        // Get the item from the buffer
-        item = get_buff_1();
+        
+        
 
-        // If the character is an endline char, replace with space
-        if(item == '\n') {
-            item = ' ';
+        // While the buffer is empty
+        while(count_1 == 0) {
+            
+            // Wait for the producer to signal that the buffer has data
+            pthread_cond_wait(&full_1, &mutex_1);
+        }       
+
+        
+
+        while(count_1 > 0) {   
+            
+            // Get the item from the buffer
+            item = get_buff_1();
+            
+
+            // If the character is an endline char, replace with space
+            if(item == '\n') {
+                item = ' ';
+            }
+
+            // Put the item in the second buffer
+            put_buff_2(item);
+
         }
 
-        // Put the item in the second buffer
-        put_buff_2(item);
-    }
+        // Signal to the consumer the buffer is no longer empty
+        pthread_cond_signal(&full_2);
+        // Unlock the mutex
+        pthread_mutex_unlock(&mutex_2);
 
-    // Signal to the consumer the buffer is no longer empty
-    pthread_cond_signal(&full_2);
-    // Unlock the mutex
-    pthread_mutex_unlock(&mutex_2);
+    }
 
     return NULL;
 }
@@ -258,49 +247,55 @@ void* replace_plus(void* args) {
 
     char item;
     char nextItem;
+    
+    // Lock the mutex before putting item in the buffer
+    pthread_mutex_lock(&mutex_3);  
 
-    // While the buffer is empty
-    while(count_2 == 0) {
-        // Wait for the producer to signal that the buffer has data
-        pthread_cond_wait(&full_2, &mutex_2);
-    }
+    while(stopFlag == 0) {
 
-    pthread_mutex_lock(&mutex_3);
 
-    while(count_2 > 0) {
+        // While the buffer is empty
+        while(count_2 == 0) {
+            // Wait for the producer to signal that the buffer has data
+            pthread_cond_wait(&full_2, &mutex_2);
+        }
 
-        // Get the next item from the buffer
-        item = get_buff_2();
+        while(count_2 > 0) {
 
-        // If the item is a plus sign
-        if (item == '+') {
+            // Get the next item from the buffer
+            item = get_buff_2();
 
-            // get the next item
-            nextItem = get_buff_2();
+            // If the item is a plus sign
+            if (item == '+') {
 
-            // If the next item is a plus sign
-            if (nextItem == '+') {
+                // get the next item
+                nextItem = get_buff_2();
 
-                // Add the ^ sign to the buffer
-                put_buff_3('^');
+                // If the next item is a plus sign
+                if (nextItem == '+') {
+
+                    // Add the ^ sign to the buffer
+                    put_buff_3('^');
+                }
+                // If the next value isn't a plus sign
+                else {
+                    // Put both values in the next buffer
+                    put_buff_3(item);
+                    put_buff_3(nextItem);
+                }
             }
-            // If the next value isn't a plus sign
+            // If the item is not a plus sign
             else {
-                // Put both values in the next buffer
                 put_buff_3(item);
-                put_buff_3(nextItem);
             }
+            
         }
-        // If the item is not a plus sign
-        else {
-            put_buff_3(item);
-        }
+        
+        // Signal to the consumer the buffer is no longer empty
+        pthread_cond_signal(&full_3);
+        // Unlock the mutex
+        pthread_mutex_unlock(&mutex_3);
     }
-
-    // Signal to the consumer the buffer is no longer empty
-    pthread_cond_signal(&full_3);
-    // Unlock the mutex
-    pthread_mutex_unlock(&mutex_3);
 
     return NULL;
 }
@@ -308,26 +303,30 @@ void* replace_plus(void* args) {
 
 
 void* write_output(void* args) {
+        
+        char item;
 
-    char item;
+        while (stopFlag == 0) {
 
-    // While the buffer is empty
-    while(count_3 == 0) {
-        // Wait for the producer to signal that the buffer has data
-        pthread_cond_wait(&full_3, &mutex_3);
-    }
+            // While the buffer is empty
+            while(count_3 == 0) {
 
-    while (count_3 > OUTPUT_LENGTH) {
+                // Wait for the producer to signal that the buffer has data
+                pthread_cond_wait(&full_3, &mutex_3);
+            }
 
-        for(int i = 0; i < OUTPUT_LENGTH; i++) {
+            while (count_3 > OUTPUT_LENGTH) {
 
-            item = get_buff_3();
-            printf("%c", item);
+                for(int i = 0; i < OUTPUT_LENGTH; i++) {
 
+                    item = get_buff_3();
+                    printf("%c", item);
+
+                }
+                printf("\n");
+
+            }
         }
-        printf("\n");
-
-    }
     return NULL;
 }
 
