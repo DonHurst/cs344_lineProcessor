@@ -62,9 +62,12 @@ pthread_mutex_t mutex_3 = PTHREAD_MUTEX_INITIALIZER;
 pthread_cond_t full_3 = PTHREAD_COND_INITIALIZER;
 // -----------------------------------------------------------------------------
 
-
-
-// Put an item in the buffer
+/********************************************************************************
+ * This function puts a character in buffer 1. It takes a character, inputs it
+ * in the buffer, and increments the producer index and count.
+ * It is adapted directly from the example 
+ * source: https://replit.com/@cs344/65prodconspipelinec
+********************************************************************************/
 void put_buff_1(char item) {
     
     // Put the item in the buffer
@@ -75,7 +78,12 @@ void put_buff_1(char item) {
     count_1 += 1;
 }
 
-// Get an item from the buffer
+/********************************************************************************
+ * This function gets a character from buffer 1. It increments the consumer
+ * index, decreases the counter for the buffer, and returns the character 
+ * It is adapted directly from the example 
+ * source: https://replit.com/@cs344/65prodconspipelinec
+********************************************************************************/
 char get_buff_1() {
     
     // Copy next value from the buffer to the current character
@@ -91,6 +99,12 @@ char get_buff_1() {
     return currChar;
 }
 
+/********************************************************************************
+ * This function puts a character in buffer 2. It takes a character, inputs it
+ * in the buffer, and increments the producer index and count.
+ * It is adapted directly from the example 
+ * source: https://replit.com/@cs344/65prodconspipelinec
+********************************************************************************/
 void put_buff_2(char item) {
     
     // Put the item in the buffer
@@ -101,6 +115,12 @@ void put_buff_2(char item) {
     count_2 += 1;
 }
 
+/********************************************************************************
+ * This function gets a character from buffer 2. It increments the consumer
+ * index, decreases the counter for the buffer, and returns the character 
+ * It is adapted directly from the example 
+ * source: https://replit.com/@cs344/65prodconspipelinec
+********************************************************************************/
 char get_buff_2() {
 
     // Copy next value from the buffer to the current character
@@ -114,20 +134,29 @@ char get_buff_2() {
     return currChar;
 }
 
+/********************************************************************************
+ * This function puts a character in buffer 3. It takes a character, inputs it
+ * in the buffer, and increments the producer index and count.
+ * It is adapted directly from the example 
+ * source: https://replit.com/@cs344/65prodconspipelinec
+********************************************************************************/
 void put_buff_3(char item) {
     
-   
-
     // Put the item in the buffer
     buffer_3[prod_idx_3] = item;
 
     // Increment the index where the next item will be put
     prod_idx_3 += 1;
     count_3 += 1;
-
-    
+   
 }
 
+/********************************************************************************
+ * This function gets a character from buffer 3. It increments the consumer
+ * index, decreases the counter for the buffer, and returns the character 
+ * It is adapted directly from the example 
+ * source: https://replit.com/@cs344/65prodconspipelinec
+********************************************************************************/
 char get_buff_3() {
 
     // Copy next value from the buffer to the current character
@@ -139,30 +168,29 @@ char get_buff_3() {
 
     //return the character
     return currChar;
-
 }
 
-/*******************************************************************
- * This function will get input from the user
-********************************************************************/
+/********************************************************************************
+ * This function gets a line. It allocates memory for a line and then uses
+ * fgets to grab the line from the standard input before returning the line
+ * It is adapted directly from an example on geeks for geeks
+ * source: https://www.geeksforgeeks.org/taking-string-input-space-c-3-different-methods/
+********************************************************************************/
 char* get_user_input() {
+    
     // Instantiate our character array
     char* inputLine;
     inputLine = (char*)malloc(LINE_SIZE * sizeof(char));
 
     // Get the user's input and return
-    // source: https://www.geeksforgeeks.org/taking-string-input-space-c-3-different-methods/
     fgets(inputLine, LINE_SIZE, stdin);
     return inputLine;
-    
 }
-
-
 
 void* get_input(void *args) { 
 
     // Lock the mutex before putting item in the buffer
-        pthread_mutex_lock(&mutex_1);
+   
 
     // While there are less than 80 items in the buffer
     while(stopFlag == 0) {
@@ -175,10 +203,13 @@ void* get_input(void *args) {
         int check = strncmp(currLine, "STOP\n", 5);
 
         // If the current line is a stop, set the flag
-        if (check == 0 ) {
+        if (check == 0) {
             stopFlag = 1;
         }
 
+        // Lock the mutex while we process the line and put it in the buffer
+        pthread_mutex_lock(&mutex_1);
+        
         // Put the current line values in buffer 1
         for (int j = 0; j < strlen(currLine); j++) {
             put_buff_1(currLine[j]);
@@ -189,7 +220,18 @@ void* get_input(void *args) {
         // Unlock the mutex
         pthread_mutex_unlock(&mutex_1);
 
+        // printf("\ncount1 - %d\n", count_1);       
+
     }
+
+    // Signal to the consumer the buffer is no longer empty
+    // pthread_cond_signal(&full_1);
+
+    // // Unlock the mutex
+    // pthread_mutex_unlock(&mutex_1);
+
+    printf("\nBroke out in getInput!\n");
+
     return NULL;
 }
 
@@ -198,29 +240,23 @@ void* replace_separator(void* args) {
 
     char item;
 
-    //Lock the mutex before putting item in the buffer
-    pthread_mutex_lock(&mutex_2);
-
     while(stopFlag == 0) {
         
-        
-        
-
         // While the buffer is empty
         while(count_1 == 0) {
-            
+
             // Wait for the producer to signal that the buffer has data
             pthread_cond_wait(&full_1, &mutex_1);
-        }       
+        } 
 
-        
+        //Lock the mutex before putting item in the buffer
+        pthread_mutex_lock(&mutex_2);
 
         while(count_1 > 0) {   
-            
+
             // Get the item from the buffer
             item = get_buff_1();
             
-
             // If the character is an endline char, replace with space
             if(item == '\n') {
                 item = ' ';
@@ -228,15 +264,16 @@ void* replace_separator(void* args) {
 
             // Put the item in the second buffer
             put_buff_2(item);
-
+            
         }
-
         // Signal to the consumer the buffer is no longer empty
         pthread_cond_signal(&full_2);
         // Unlock the mutex
-        pthread_mutex_unlock(&mutex_2);
+        pthread_mutex_unlock(&mutex_2);  
 
     }
+
+    printf("\nBroke out in Replace!\n");
 
     return NULL;
 }
@@ -295,7 +332,12 @@ void* replace_plus(void* args) {
         pthread_cond_signal(&full_3);
         // Unlock the mutex
         pthread_mutex_unlock(&mutex_3);
+
+        // printf("\nIn replace sep | Buffer 1 - %d, Buffer 2 - %d, Buffer 3 - %d\n", count_1, count_2, count_3);
     }
+
+    printf("\nBroke out in Plus!\n");
+
 
     return NULL;
 }
@@ -315,6 +357,7 @@ void* write_output(void* args) {
                 pthread_cond_wait(&full_3, &mutex_3);
             }
 
+            // While the buffer count is less than the length of the output
             while (count_3 > OUTPUT_LENGTH) {
 
                 for(int i = 0; i < OUTPUT_LENGTH; i++) {
@@ -327,6 +370,8 @@ void* write_output(void* args) {
 
             }
         }
+
+        printf("BROKE OUT in write!\n");
     return NULL;
 }
 

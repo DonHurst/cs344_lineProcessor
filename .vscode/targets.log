@@ -1,6 +1,5 @@
 make all --print-data-base --no-builtin-variables --no-builtin-rules --question
 # GNU Make 3.81
- 
 # Copyright (C) 2006  Free Software Foundation, Inc.
 # This is free software; see the source for copying conditions.
 # There is NO warranty; not even for MERCHANTABILITY or FITNESS FOR A
@@ -11,7 +10,7 @@ make all --print-data-base --no-builtin-variables --no-builtin-rules --question
 make: *** No rule to make target `all'.  Stop.
  
 
-# Make data base, printed on Wed Feb  9 16:53:57 2022
+# Make data base, printed on Wed Feb 16 00:09:58 2022
 
 # Variables
 
@@ -42,7 +41,7 @@ VSCODE_VERBOSE_LOGGING = true
 # environment
 __CFBundleIdentifier = com.microsoft.VSCode
 # environment
-VSCODE_IPC_HOOK_EXTHOST = /var/folders/c6/f48bsxm52fx51cl0nw3ngv480000gn/T/vscode-ipc-8bebc57a-065a-4423-90ce-b3ccd6e1a91c.sock
+VSCODE_IPC_HOOK_EXTHOST = /var/folders/c6/f48bsxm52fx51cl0nw3ngv480000gn/T/vscode-ipc-0f36d136-4719-4d94-a17f-5f75e8787985.sock
 # environment
 VSCODE_CWD = /
 # environment
@@ -109,7 +108,6 @@ MAKE_COMMAND := /Applications/Xcode.app/Contents/Developer/usr/bin/make
 .VARIABLES := 
 # environment
 TMPDIR = /var/folders/c6/f48bsxm52fx51cl0nw3ngv480000gn/T/
- 
 # automatic
 *F = $(notdir $*)
 # environment
@@ -234,6 +232,6 @@ class:
 # strcache size: total = 4096 / max = 4096 / min = 4096 / avg = 4096
 # strcache free: total = 4087 / max = 4087 / min = 4087 / avg = 4087
 
-# Finished Make data base on Wed Feb  9 16:53:57 2022
+# Finished Make data base on Wed Feb 16 00:09:58 2022
 
  
