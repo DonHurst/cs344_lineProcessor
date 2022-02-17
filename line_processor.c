@@ -316,12 +316,10 @@ void* replace_plus(void* args) {
     char item;
     char nextItem;
     
-    
+    // Lock the mutex before putting item in the buffer
+    pthread_mutex_lock(&mutex_3);  
 
     while(1) {
-
-        // Lock the mutex before putting item in the buffer
-        pthread_mutex_lock(&mutex_3);  
 
 
         // While the buffer is empty
