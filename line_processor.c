@@ -10,6 +10,8 @@
 
 // Flag for stopping the program
 int stopFlag = 0;
+int stopFlag_2 = 0;
+int stopFlag_3 = 0;
 
 // ------------------------------ Buffer 1 -------------------------------------
 // Defining Buffer1, shared between input thread and line separator thread
@@ -188,12 +190,14 @@ char* get_user_input() {
 }
 
 /********************************************************************************
- * This thread gets the 
+ * This thread gets the input from the user. It calls the get_user_input func
+ * and then checks to see if it's a STOP line. If it's a STOP flag, it returns. 
+ * Otherwise, it adds the line to the buffer and signals the consumer
 ********************************************************************************/
 void* get_input(void *args) { 
 
     // While we haven't encountered the STOP line
-    while(stopFlag == 0) {
+    while(1) {
 
         // Get a line from the user and enter it into the buffer
         char currLine[LINE_SIZE];
@@ -227,24 +231,33 @@ void* get_input(void *args) {
     // Unlock the mutex
     pthread_mutex_unlock(&mutex_1); 
 
-
-
-    // printf("\nBroke out in getInput!\n");
+    // printf("\nBroke out of get input!\n");
 
     return NULL;
 }
 
-
+/********************************************************************************
+ * This thread replaces the line separator. It checks if the buffer has values
+ * and if it does, it gets the items from the buffer and replaces any line 
+ * separators with spaces. Finally, it puts the items in the second buffer and 
+ * signals to the next consumer.
+********************************************************************************/
 void* replace_separator(void* args) {
 
     char item;
 
     while(1) {
+
+         // Lock the mutex while we process the line and put it in the buffer
+        pthread_mutex_lock(&mutex_1);
+
+        
         
         // While the buffer is empty
         while(count_1 == 0) {
 
             if (stopFlag == 1) {
+                stopFlag_2 = 1;
                 break;
             }
 
@@ -275,33 +288,47 @@ void* replace_separator(void* args) {
         pthread_mutex_unlock(&mutex_2);  
 
         if (stopFlag == 1) {
+            stopFlag_2 = 1;
             break;
         }
 
+        // Signal to the consumer the buffer is no longer empty
+        pthread_cond_signal(&full_1);
+        
+        // Unlock the mutex
+        pthread_mutex_unlock(&mutex_1); 
+
     }
 
-    // printf("\nBroke out in Replace!\n");
-
+    // printf("\nBroke out of replace sep!\n");
     return NULL;
 }
 
 
-
+/********************************************************************************
+ * This thread replaces any pair of plus signs. It checks if the buffer has values
+ * and if it does, it gets the items from the buffer and replaces any pair of +
+ * signs with ^. Finally, it puts the items in the second buffer and signals to
+ * the next consumer.
+********************************************************************************/
 void* replace_plus(void* args) {
 
     char item;
     char nextItem;
     
-    // Lock the mutex before putting item in the buffer
-    pthread_mutex_lock(&mutex_3);  
+    
 
     while(1) {
+
+        // Lock the mutex before putting item in the buffer
+        pthread_mutex_lock(&mutex_3);  
 
 
         // While the buffer is empty
         while(count_2 == 0) {
 
-            if (stopFlag == 1) {
+            if (stopFlag_2 == 1) {
+                stopFlag_3 = 1;
                 break;
             }
             // Wait for the producer to signal that the buffer has data
@@ -344,11 +371,10 @@ void* replace_plus(void* args) {
         // Unlock the mutex
         pthread_mutex_unlock(&mutex_3);
 
-        if (stopFlag == 1) {
+        if (stopFlag_2 == 1) {
             break;
         }
 
-        // printf("\nIn replace sep | Buffer 1 - %d, Buffer 2 - %d, Buffer 3 - %d\n", count_1, count_2, count_3);
     }
 
     // Signal to the consumer the buffer is no longer empty
@@ -356,14 +382,18 @@ void* replace_plus(void* args) {
     // Unlock the mutex
     pthread_mutex_unlock(&mutex_3); 
 
-    // printf("\nBroke out in Plus!\n");
-
+    // printf("\nBroke out of replace plus!\n");
 
     return NULL;
 }
 
 
-
+/********************************************************************************
+ * This thread writes the output to stdout. It checks to see if the buffer has 
+ * values and if it does, it checks to see if there are more than 80 values in 
+ * the buffer. If there are, it prints exactly 80 values and moves to the next
+ * line.
+********************************************************************************/
 void* write_output(void* args) {
         
         char item;
@@ -373,7 +403,7 @@ void* write_output(void* args) {
             // While the buffer is empty
             while(count_3 == 0) {
 
-                if (stopFlag == 1) {
+                if (stopFlag_3 == 1) {
                     break;
                 }
 
@@ -381,9 +411,10 @@ void* write_output(void* args) {
                 pthread_cond_wait(&full_3, &mutex_3);
             }
 
-            // While the buffer count is less than the length of the output
+            // While the buffer count is greater than the length of the output
             while (count_3 > OUTPUT_LENGTH) {
 
+                // Print the 80 values to std out
                 for(int i = 0; i < OUTPUT_LENGTH; i++) {
 
                     item = get_buff_3();
@@ -398,8 +429,7 @@ void* write_output(void* args) {
             break;
             }
         }
-
-        // printf("BROKE OUT in write!\n");
+    // printf("\nBroke out of write output!\n");
     return NULL;
 }
 
@@ -408,10 +438,7 @@ void* write_output(void* args) {
 
 int main() {
 
-    // Instantiate single thread
-    // pthread_t singleThread;
-    // pthread_create(&singleThread, NULL, executeFunctions, NULL);
-
+    // Instantiate threads
     pthread_t get_input_t, replace_separator_t, replace_plus_t, write_output_t;
 
     // Create the threads
@@ -425,10 +452,6 @@ int main() {
     pthread_join(replace_separator_t,NULL);
     pthread_join(replace_plus_t,NULL);
     pthread_join(write_output_t,NULL);
-
-    // // Wait for threads to terminate
-    // pthread_join(singleThread, NULL);
-
 
     return EXIT_SUCCESS;
 }
