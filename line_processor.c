@@ -9,6 +9,7 @@
 #define OUTPUT_LENGTH 80
 
 // Flag for stopping the program
+// Multiple flags so each thread can signal the subsequent thread
 int stopFlag = 0;
 int stopFlag_2 = 0;
 int stopFlag_3 = 0;
@@ -22,10 +23,8 @@ int count_1 = 0;
 int prod_idx_1 = 0;
 // Index where the line separator thread will pick up the next item
 int con_idx_1 = 0;
-
 // Initialize the mutex for buffer 1
 pthread_mutex_t mutex_1 = PTHREAD_MUTEX_INITIALIZER;
-
 // Initialize the condition variable for buffer 1
 pthread_cond_t full_1 = PTHREAD_COND_INITIALIZER;
 // -----------------------------------------------------------------------------
@@ -39,10 +38,8 @@ int count_2 = 0;
 int prod_idx_2 = 0;
 // Index where the line separator thread will pick up the next item
 int con_idx_2 = 0;
-
 // Initialize the mutex for buffer 2
 pthread_mutex_t mutex_2 = PTHREAD_MUTEX_INITIALIZER;
-
 // Initialize the condition variable for buffer 2
 pthread_cond_t full_2 = PTHREAD_COND_INITIALIZER;
 // -----------------------------------------------------------------------------
@@ -56,10 +53,8 @@ int count_3 = 0;
 int prod_idx_3 = 0;
 // Index where the line separator thread will pick up the next item
 int con_idx_3 = 0;
-
 // Initialize the mutex for buffer 3
 pthread_mutex_t mutex_3 = PTHREAD_MUTEX_INITIALIZER;
-
 // Initialize the condition variable for buffer 2
 pthread_cond_t full_3 = PTHREAD_COND_INITIALIZER;
 // -----------------------------------------------------------------------------
@@ -206,7 +201,8 @@ void* get_input(void *args) {
         // Check if the current line is a STOP value
         int check = strncmp(currLine, "STOP\n", 5);
 
-        // If the current line is a stop, set the flag
+        // If the current line is a stop. If so,
+        // set flag and break out of the loop
         if (check == 0) {
             stopFlag = 1;
             break;
@@ -226,12 +222,9 @@ void* get_input(void *args) {
         pthread_mutex_unlock(&mutex_1); 
     }
 
-    // Signal to the consumer the buffer is no longer empty
+    // Unlock and signal for consumer when we break out
     pthread_cond_signal(&full_1);
-    // Unlock the mutex
     pthread_mutex_unlock(&mutex_1); 
-
-    // printf("\nBroke out of get input!\n");
 
     return NULL;
 }
@@ -244,18 +237,18 @@ void* get_input(void *args) {
 ********************************************************************************/
 void* replace_separator(void* args) {
 
+    // Temp variable for checking
     char item;
 
     while(1) {
 
-         // Lock the mutex while we process the line and put it in the buffer
+         // Lock the mutex 
         pthread_mutex_lock(&mutex_1);
 
-        
-        
         // While the buffer is empty
         while(count_1 == 0) {
 
+            // If stopflag, indicate next flag and break the loop
             if (stopFlag == 1) {
                 stopFlag_2 = 1;
                 break;
@@ -268,6 +261,7 @@ void* replace_separator(void* args) {
         //Lock the mutex before putting item in the buffer
         pthread_mutex_lock(&mutex_2);
 
+        // While there are items in the buffer
         while(count_1 > 0) {   
 
             // Get the item from the buffer
@@ -282,25 +276,19 @@ void* replace_separator(void* args) {
             put_buff_2(item);
             
         }
-        // Signal to the consumer the buffer is no longer empty
-        pthread_cond_signal(&full_2);
-        // Unlock the mutex
-        pthread_mutex_unlock(&mutex_2);  
 
+        // Unlock and signal mutexs 
+        pthread_cond_signal(&full_2);
+        pthread_mutex_unlock(&mutex_2);  
+        pthread_cond_signal(&full_1);
+        pthread_mutex_unlock(&mutex_1); 
+
+        // If stopflag, indicate next flag and break the loop
         if (stopFlag == 1) {
             stopFlag_2 = 1;
             break;
         }
-
-        // Signal to the consumer the buffer is no longer empty
-        pthread_cond_signal(&full_1);
-        
-        // Unlock the mutex
-        pthread_mutex_unlock(&mutex_1); 
-
     }
-
-    // printf("\nBroke out of replace sep!\n");
     return NULL;
 }
 
@@ -313,18 +301,19 @@ void* replace_separator(void* args) {
 ********************************************************************************/
 void* replace_plus(void* args) {
 
+    // Variables to hold 2 characters for checking
     char item;
     char nextItem;
-    
-    // Lock the mutex before putting item in the buffer
-    pthread_mutex_lock(&mutex_3);  
 
     while(1) {
 
+        // Lock the mutex before putting item in the buffer
+        pthread_mutex_lock(&mutex_2);  
 
         // While the buffer is empty
         while(count_2 == 0) {
 
+            // If stopflag, indicate next flag and break the loop
             if (stopFlag_2 == 1) {
                 stopFlag_3 = 1;
                 break;
@@ -333,6 +322,10 @@ void* replace_plus(void* args) {
             pthread_cond_wait(&full_2, &mutex_2);
         }
 
+        // Lock the mutex before putting item in the buffer
+        pthread_mutex_lock(&mutex_3);  
+
+        // While there are items in the buffer
         while(count_2 > 0) {
 
             // Get the next item from the buffer
@@ -364,24 +357,18 @@ void* replace_plus(void* args) {
             
         }
         
-        // Signal to the consumer the buffer is no longer empty
+        // Unlock and signal mutexs 
         pthread_cond_signal(&full_3);
-        // Unlock the mutex
         pthread_mutex_unlock(&mutex_3);
+        pthread_cond_signal(&full_2);
+        pthread_mutex_unlock(&mutex_2); 
 
+        // If stopflag, indicate next flag and break the loop
         if (stopFlag_2 == 1) {
+            stopFlag_3 = 1;
             break;
         }
-
     }
-
-    // Signal to the consumer the buffer is no longer empty
-    pthread_cond_signal(&full_3);
-    // Unlock the mutex
-    pthread_mutex_unlock(&mutex_3); 
-
-    // printf("\nBroke out of replace plus!\n");
-
     return NULL;
 }
 
@@ -394,9 +381,13 @@ void* replace_plus(void* args) {
 ********************************************************************************/
 void* write_output(void* args) {
         
+        // Temp variable for the character
         char item;
 
         while (1) {
+
+            // Lock the third buffer
+            pthread_mutex_lock(&mutex_3);  
 
             // While the buffer is empty
             while(count_3 == 0) {
@@ -422,16 +413,20 @@ void* write_output(void* args) {
                 printf("\n");
 
             }
+            
+            // Signal to the consumer the buffer is no longer empty
+            pthread_cond_signal(&full_3);
+            // Unlock the mutex
+            pthread_mutex_unlock(&mutex_3);
 
-            if (stopFlag == 1) {
-            break;
+            // If we have the flag and there isn't enough in the buffer to print
+            if (stopFlag_3 == 1 && count_3 < OUTPUT_LENGTH) {
+                break;
             }
         }
-    // printf("\nBroke out of write output!\n");
+
     return NULL;
 }
-
-
 
 
 int main() {
